@@ -2,7 +2,6 @@
 #include "node.h"
 #include <unordered_map>
 #include <string>
-#include "ppl.h"
 
 struct instruction
 {
@@ -78,6 +77,12 @@ public:
     {
       switch (it->opcode)
       {
+      case VARIABLE:
+      {
+        auto weight = it->weight;
+        it->value = it->data[row] * weight;
+        break;
+      }
       case ADD:
       {
         it->value = code[it->index].value + code[it->index + 1].value;
@@ -98,12 +103,7 @@ public:
         it->value = code[it->index].value / code[it->index + 1].value;
         break;
       }
-      case VARIABLE:
-      {
-        auto weight = it->weight;
-        it->value = it->data[row] * weight;
-        break;
-      }
+
       default: break;
       }
     }

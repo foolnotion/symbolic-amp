@@ -56,8 +56,10 @@ int main(int argc, char* argv[])
   // create some trees
   vector<node*> trees(ntrees);
   generate(begin(trees), end(trees), [=, &rnd, &data]() { return node::Random(rnd.get(), data, depth); });
-  unsigned long nodes = accumulate(begin(trees), end(trees), 0, [=](unsigned long len, node* p) { return len + p->GetLength(); });
-  
+  unsigned long long nodes = accumulate(begin(trees), end(trees), 0, [=](unsigned long len, node* p) { return len + p->GetLength(); });
+
+  cout << "nodes = " << nodes << endl;
+
   auto ac = accelerator::get_all()[0];
   accelerator::set_default(ac.device_path);
 
@@ -65,17 +67,23 @@ int main(int argc, char* argv[])
   auto start = hrc->now();
   vector<double> eval(nrows);
   std::for_each(execution::seq, begin(trees), end(trees), [&](node *t){ 
-    interpreter::evaluate(t, rows, data);
+    auto instructions = interpreter::compile(t, data);
+    for (int i = 0; i < nrows; ++i) {
+      interpreter::evaluate(instructions, i);
+    }
   });
-  auto cpu_single_time = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count();
-  auto cpu_single_speed = nodes / 1e3 / cpu_single_time * nrows; // kN/s
+  auto cpu_single_time = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count() / 1e3;
+  auto cpu_single_speed = nodes / cpu_single_time /1e6 * nrows;
 
   start = hrc->now();
   std::for_each(execution::par, begin(trees), end(trees), [&](node *t){ 
-    interpreter::evaluate(t, rows, data);
+    auto instructions = interpreter::compile(t, data);
+    for (int i = 0; i < nrows; ++i) {
+      interpreter::evaluate(instructions, i);
+    }
   });
-  auto cpu_multi_time = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count();
-  auto cpu_multi_speed = nodes / 1e3 / cpu_multi_time * nrows; // kN/s
+  auto cpu_multi_time = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count() / 1e3;
+  auto cpu_multi_speed = nodes / cpu_multi_time / 1e6 * nrows; 
 
   try {
     // C++ AMP kernels are Just-In-Time (JIT) compiled from High Level Shader Language (HLSL) bytecode to machine code by the GPU driver at run time. 
@@ -84,11 +92,10 @@ int main(int argc, char* argv[])
     auto interp = make_unique<amp_interpreter>(data);
     start = hrc->now();
     std::for_each(execution::seq, begin(trees), end(trees), [&](node *t) {
-      auto amp_eval = interp->evaluate(t);
+      interp->evaluate(t);
     });
-    
-    auto gpu_time = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count();
-    auto gpu_speed = nodes / 1e3 / gpu_time * nrows; // kN/s
+    auto gpu_time = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count() / 1e3;
+    auto gpu_speed = nodes / gpu_time / 1e6 * nrows; 
     cout << cpu_single_speed << ";" << cpu_multi_speed << ";" << gpu_speed << endl;
   }
   catch (exception e)
