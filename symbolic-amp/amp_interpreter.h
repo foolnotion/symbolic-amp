@@ -9,15 +9,15 @@
 class amp_instruction
 {
 public:
-  amp_instruction(int data_size) : data(data_size) {}
+  amp_instruction(int data_size) {}
   op_code                                            opcode;
   int                                                 index;
   double                                              value;
   double                                             weight;
   std::string                                         label;
-  concurrency::array_view<double, 1> data;
+  std::unique_ptr<concurrency::array_view<double, 1>> data;
 
-  amp_instruction() : data(1) {}
+  amp_instruction() {}
 
 };
 

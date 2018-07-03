@@ -26,10 +26,12 @@ vector<amp_instruction> amp_interpreter::compile(node *root) const
       if (subtree->GetOpCode() == VARIABLE)
       {
         instr.weight = subtree->GetWeight();
+        instr.data = std::make_unique<concurrency::array_view<double, 1>>(rows);
       }
       if (subtree->GetOpCode() == CONSTANT)
       {
         instr.value = subtree->GetValue();
+        instr.data = std::make_unique<concurrency::array_view<double, 1>>(rows);
       }
       instructions[c + j] = std::move(instr);
     }
@@ -53,9 +55,9 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     {
     case ADD:
     {
-      it->data = code[it->index].data;
-      auto a = it->data;
-      auto b = code[it->index + 1].data;
+      it->data = std::move(code[it->index].data);
+      auto a = *it->data;
+      auto b = *code[it->index + 1].data;
       parallel_for_each(a.extent, [=](index<1> idx) restrict(amp)
       {
         a[idx] += b[idx];
@@ -64,9 +66,9 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     }
     case SUB:
     {
-      it->data = code[it->index].data;
-      auto a = it->data;
-      auto b = code[it->index + 1].data;
+      it->data = std::move(code[it->index].data);
+      auto a = *it->data;
+      auto b = *code[it->index + 1].data;
       parallel_for_each(a.extent, [=](index<1> idx) restrict(amp)
       {
         a[idx] -= b[idx];
@@ -75,9 +77,9 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     }
     case MUL:
     {
-      it->data = code[it->index].data;
-      auto a = it->data;
-      auto b = code[it->index + 1].data;
+      it->data = std::move(code[it->index].data);
+      auto a = *it->data;
+      auto b = *code[it->index + 1].data;
       parallel_for_each(a.extent, [=](index<1> idx) restrict(amp)
       {
         a[idx] *= b[idx];
@@ -86,9 +88,9 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     }
     case DIV:
     {
-      it->data = code[it->index].data;
-      auto a = it->data;
-      auto b = code[it->index + 1].data;
+      it->data = std::move(code[it->index].data);
+      auto a = *it->data;
+      auto b = *code[it->index + 1].data;
       parallel_for_each(a.extent, [=](index<1> idx) restrict(amp)
       {
         a[idx] /= b[idx];
@@ -97,7 +99,7 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     }
     case VARIABLE:
     {
-      concurrency::array_view<double, 1> a = it->data;
+      concurrency::array_view<double, 1> a = *it->data;
       concurrency::array_view<const double, 1> v = *gpu_data[it->label];
       double weight = it->weight;
       parallel_for_each(a.extent, [=](index<1> idx) restrict(amp)
@@ -107,7 +109,7 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
       break;
     }
     case CONSTANT: {
-      auto a = it->data;
+      auto a = *it->data;
       double v = it->value;
       parallel_for_each(a.extent, [=](index<1> i) restrict(amp)
       {
@@ -118,5 +120,5 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     default: break;
     }
   }
-  return code[0].data;
+  return *code[0].data;
 }
