@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <memory>
 #include <chrono>
 #include <unordered_map>
@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
   generate(begin(trees), end(trees), [=, &rnd, &data]() { return node::Random(rnd.get(), data, depth); });
   unsigned long long nodes = accumulate(begin(trees), end(trees), 0, [=](unsigned long len, node* p) { return len + p->GetLength(); });
 
-  cout << "nodes = " << nodes << endl;
+  //cout << "nodes = " << nodes << endl;
 
   auto ac = accelerator::get_all()[0];
   accelerator::set_default(ac.device_path);
@@ -90,6 +90,7 @@ int main(int argc, char* argv[])
     // Compiled kernels are cached until the process terminates.This means that there is an additional compilation overhead that occurs for each call 
     // site of lambda or function marked with restrict(amp). Run the kernel once to force the JIT compiler to run prior to executing the timed kernel.
     auto interp = make_unique<amp_interpreter>(data);
+
     start = hrc->now();
     std::for_each(execution::seq, begin(trees), end(trees), [&](node *t) {
       interp->evaluate(t);
@@ -102,6 +103,9 @@ int main(int argc, char* argv[])
   {
     cout << "ERROR: " << e.what() << endl;
   }
+
+  for (auto t : trees)
+    delete t;
 
   return 0;
 }

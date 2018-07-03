@@ -7,9 +7,7 @@ using namespace concurrency;
 vector<amp_instruction> amp_interpreter::compile(node *root) const
 {
   vector<amp_instruction> instructions(root->GetLength());
-  amp_instruction ai(rows);
-  ai.opcode = root->GetOpCode();
-  instructions[0] = std::move(ai);
+  instructions[0].opcode = root->GetOpCode();
   auto nodes = root->IterateBreadth();
   int c = 1;
   for (size_t i = 0; i < nodes.size(); ++i) {
@@ -20,7 +18,7 @@ vector<amp_instruction> amp_interpreter::compile(node *root) const
     for (size_t j = 0; j != subtrees.size(); ++j)
     {
       auto subtree = subtrees[j];
-      amp_instruction instr(rows);
+      auto & instr = instructions[c + j];
       instr.opcode = subtree->GetOpCode();
       instr.label = subtree->GetName();
       if (subtree->GetOpCode() == VARIABLE)
@@ -33,7 +31,6 @@ vector<amp_instruction> amp_interpreter::compile(node *root) const
         instr.value = subtree->GetValue();
         instr.data = std::make_unique<concurrency::array_view<double, 1>>(rows);
       }
-      instructions[c + j] = std::move(instr);
     }
     instructions[i].index = c;
     c += node->SubtreeCount();
@@ -41,13 +38,13 @@ vector<amp_instruction> amp_interpreter::compile(node *root) const
   return instructions;
 }
 
-array_view<double, 1> amp_interpreter::evaluate(node *root)
+unique_ptr<array_view<double, 1>> amp_interpreter::evaluate(node *root)
 {
   auto instructions = compile(root);
-  return evaluate(instructions);
+  return std::move(evaluate(instructions));
 }
 
-array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
+unique_ptr<array_view<double, 1> >amp_interpreter::evaluate(vector<amp_instruction>& code)
 {
   for (auto it = rbegin(code); it != rend(code); ++it)
   {
@@ -99,8 +96,8 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     }
     case VARIABLE:
     {
-      concurrency::array_view<double, 1> a = *it->data;
-      concurrency::array_view<const double, 1> v = *gpu_data[it->label];
+      auto a = *it->data;
+      auto v = *gpu_data[it->label];
       double weight = it->weight;
       parallel_for_each(a.extent, [=](index<1> idx) restrict(amp)
       {
@@ -120,5 +117,5 @@ array_view<double, 1> amp_interpreter::evaluate(vector<amp_instruction>& code)
     default: break;
     }
   }
-  return *code[0].data;
+  return std::move(code[0].data);
 }

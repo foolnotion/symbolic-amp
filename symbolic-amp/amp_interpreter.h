@@ -9,16 +9,13 @@
 class amp_instruction
 {
 public:
-  amp_instruction(int data_size) {}
+  amp_instruction() {}
   op_code                                            opcode;
   int                                                 index;
   double                                              value;
   double                                             weight;
   std::string                                         label;
-  std::unique_ptr<concurrency::array_view<double, 1>> data;
-
-  amp_instruction() {}
-
+  std::unique_ptr<concurrency::array_view<double, 1>>  data;
 };
 
 class amp_interpreter
@@ -36,8 +33,8 @@ public:
 
   std::vector<amp_instruction> compile(node *root) const;
 
-  concurrency::array_view<double, 1> evaluate(node *root);
-  concurrency::array_view<double, 1> evaluate(std::vector<amp_instruction>& instructions);
+  std::unique_ptr<concurrency::array_view<double, 1>> evaluate(node *root);
+  std::unique_ptr<concurrency::array_view<double, 1>> evaluate(std::vector<amp_instruction>& instructions);
 
 private:
   int rows;
