@@ -24,7 +24,7 @@ static void Grow(random *rnd, node* n, std::unordered_map<std::string, std::vect
 {
     for (int i = 0; i < 2; ++i)
     {
-        auto op = depth < max_depth ? static_cast<op_code>(rnd->next(DIV)) : VARIABLE;
+        auto op = depth < max_depth ? (rnd->next_double() > 0.5 ? static_cast<op_code>(rnd->next(DIV)) : VARIABLE) : VARIABLE;
         auto subtree = new node(op, "");
 
         if (op == VARIABLE)
@@ -54,7 +54,7 @@ node* node::Random(random *rnd, std::unordered_map<std::string, std::vector<doub
 }
 
 
-int node::GetLength()
+int node::GetLength() 
 {
     if (length_ <= 0)
         length_ = accumulate(begin(subtrees_), end(subtrees_), 1, [&](int length, node *n) { return length + n->GetLength(); });

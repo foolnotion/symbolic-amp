@@ -10,8 +10,7 @@ struct instruction
     int                  index;
     double               value;
     double              weight;
-    std::string          label;
-    std::vector<double>   data;
+    double               *data;
 };
 
 class interpreter
@@ -36,11 +35,10 @@ public:
             {
                 auto subtree = subtrees[j];
                 instruction instr;
-                instr.label = subtree->GetName();
                 instr.opcode = subtree->GetOpCode();
                 if (subtree->GetOpCode() == VARIABLE)
                 {
-                    instr.data = data[instr.label];
+                    instr.data = data[subtree->GetName()].data();
                     instr.weight = subtree->GetWeight();
                 }
                 if (subtree->GetOpCode() == CONSTANT)

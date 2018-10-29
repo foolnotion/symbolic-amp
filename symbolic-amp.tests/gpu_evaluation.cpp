@@ -44,14 +44,19 @@ namespace symbolicamptests
         {
             auto repetitions = 10;
             auto depth = 5;
-            auto ntrees = (int)1e3;
-            auto nrows = (int)1e5;
+            auto ntrees = (int)100;
+            auto nrows = (int)1e6;
+            auto nvars = 2;
 
             // generate test data
             auto rand = make_unique<random>();
-            auto values = vector<double>(nrows);
-            generate(begin(values), end(values), [&] { return rand->next_double(); });
-            auto data = unordered_map<string, vector<double>>{ { "x1", values } };
+            auto data = unordered_map<string, vector<double>>();
+            for (int i = 0; i < nvars; ++i)
+            {
+                auto values = vector<double>(nrows);
+                generate(begin(values), end(values), [&] { return rand->next_double(); });
+                data["x" + std::to_string(i + 1)] = values;
+            }
 
             auto trees = vector<node*>(ntrees);
             generate(begin(trees), end(trees), [&]() { return node::Random(rand.get(), data, depth); });
@@ -71,6 +76,54 @@ namespace symbolicamptests
                 for (auto tree : trees)
                 {
                     gpu_interp->evaluate(tree);
+                }
+            }
+            unsigned long nodes = accumulate(begin(trees), end(trees), 0, [=](unsigned long len, node* p) { return len + p->GetLength(); });
+            auto elapsed = chrono::duration_cast<chrono::milliseconds>(hrc->now() - start).count() / 1e3;
+            auto speed = nodes / elapsed * nrows * repetitions;
+            ostringstream ss;
+            ss << elapsed << " seconds elapsed. " << speed << " nodes/s";
+            Logger::WriteMessage(ss.str().c_str());
+        }
+
+        TEST_METHOD(CpuEvaluationSpeedTest)
+        {
+            auto repetitions = 10;
+            auto depth = 10;
+            auto ntrees = (int)1000;
+            auto nrows = (int)1e4;
+            auto nvars = 2;
+
+            // generate test data
+            auto rand = make_unique<random>();
+            auto data = unordered_map<string, vector<double>>();
+            for (int i = 0; i < nvars; ++i)
+            {
+                auto values = vector<double>(nrows);
+                generate(begin(values), end(values), [&] { return rand->next_double(); });
+                data["x" + std::to_string(i + 1)] = values;
+            }
+
+            auto trees = vector<node*>(ntrees);
+            auto rows = vector<int>(nrows);
+            int row = 0;
+            generate(begin(trees), end(trees), [&]() { return node::Random(rand.get(), data, depth); });
+            generate(begin(rows), end(rows), [&]() { return row++; });
+
+            interpreter interp;
+            // warm-up
+            for (auto tree : trees)
+            {
+                interp.evaluate(tree, rows, data);
+            }
+
+            auto hrc = make_unique<chrono::high_resolution_clock>();
+            auto start = hrc->now();
+            for (int i = 0; i < repetitions; ++i)
+            {
+                for (auto tree : trees)
+                {
+                    interp.evaluate(tree, rows, data);
                 }
             }
             unsigned long nodes = accumulate(begin(trees), end(trees), 0, [=](unsigned long len, node* p) { return len + p->GetLength(); });
